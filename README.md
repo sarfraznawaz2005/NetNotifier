@@ -4,14 +4,14 @@
 
 ## Features
 
-- **Real-time Connectivity Monitoring**: Continuously checks internet availability by pinging a configurable target (default: `google.com`).
+- **Real-time Connectivity Monitoring**: Continuously checks internet availability by pinging google.com (additional targets can be configured).
 - **Visual Status Indicators**: Changes the system tray icon to reflect connection status:
     - `green.ico`: Internet is online.
     - `red.ico`: Internet is offline or experiencing issues.
 - **Voice Alerts**: Optional voice notifications for connection status changes (e.g., "Connection Restored", "Connection Lost").
 - **Configurable Settings**: A user-friendly GUI allows you to customize:
     - **Check Interval**: How frequently the script checks for internet connectivity.
-    - **Ping Target**: The URL or IP address used for pinging.
+     - **Ping Targets**: Comma-separated list of URLs/IPs for pinging (default: google.com).
     - **Voice Alerts**: Enable or disable spoken notifications.
     Settings are saved to `Settings.ini`.
 - **Connection Statistics**: Tracks and displays useful metrics in the tray icon tooltip, including:
