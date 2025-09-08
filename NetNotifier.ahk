@@ -220,15 +220,22 @@ UpdateTooltip() {
         local Seconds := Mod(ElapsedTime, 60)
         local uptime := Format("{:02}:{:02}:{:02}", Hours, Minutes, Seconds)
         ;local Latency := GetLastPingTime()
-        local Availability := TotalChecks > 0 ? (SuccessfulChecks / TotalChecks) * 100 : 0
         local LocalIP := GetPublicIPCached()
+        
+        local Availability := TotalChecks > 0 ? (SuccessfulChecks / TotalChecks) * 100 : 0
+        
+        ; Ensure that if there have been disconnects, uptime never shows as 100%
+        local DisplayAvailability := Round(Availability, 1)
+        if (DisconnectsToday > 0 && DisplayAvailability = 100.0) {
+            DisplayAvailability := 99.9
+        }
         
         ; Keep tooltip concise due to Windows tooltip length limitations
         A_IconTip := (
             "IP:`t" . LocalIP . "`n"
             . "Uptime:`t" . uptime . "`n"
             . "Drops:`t" . DisconnectsToday . "`n"
-            . "Up:`t" . Round(Availability, 1) . "%"
+            . "Up:`t" . DisplayAvailability . "%"
         )
     } else if (LastStatus == "ISSUES") {
         A_IconTip := ("NO INTERNET")
