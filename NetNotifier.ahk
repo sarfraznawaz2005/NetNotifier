@@ -3,15 +3,15 @@
 
 class NetNotifierApp {
     ; Constants
-    static DEFAULT_INTERVAL := 3000
-    static DEFAULT_PING_TIMEOUT := 3000  ; 2 seconds for faster detection
-    static MIN_INTERVAL := 1000
+    static DEFAULT_INTERVAL := 5000  ; 5 seconds for balanced detection
+    static DEFAULT_PING_TIMEOUT := 5000  ; 5 seconds for reliable timeout
+    static MIN_INTERVAL := 5000  ; 5 seconds minimum to reduce false positives
     static MAX_INTERVAL := 300000
-    static MIN_PING_TIMEOUT := 2000
+    static MIN_PING_TIMEOUT := 3000  ; 3 seconds minimum timeout
     static MAX_PING_TIMEOUT := 10000
     static IP_CACHE_TTL := 5 * 60 * 1000  ; 5 minutes
     static GATEWAY_CACHE_TTL := 10 * 60 * 1000  ; 10 minutes for gateway
-    static DEFAULT_DNS_HOST := "www.google.com"
+    static DEFAULT_DNS_HOST := "google.com"
     static DEFAULT_PING_TARGETS := ["google.com"]  ; Single reliable target for faster detection
 
     ; Properties (formerly global variables)
@@ -105,8 +105,8 @@ class NetNotifierApp {
 
     UpdateStatistics(currentStatus) {
         this.TotalChecks++
-        if (currentStatus == "ONLINE" || currentStatus == "ISSUES")
-            this.SuccessfulChecks++  ; Count partial connectivity as successful
+        if (currentStatus == "ONLINE")
+            this.SuccessfulChecks++  ; Only count fully online as successful
     }
 
     HandleStatusChange(newStatus, oldStatus) {
@@ -310,12 +310,9 @@ class NetNotifierApp {
             local LocalIP := this.GetPublicIPCached()
             
             local Availability := this.TotalChecks > 0 ? (this.SuccessfulChecks / this.TotalChecks) * 100 : 0
-            
-            ; Ensure that if there have been disconnects, uptime never shows as 100%
-            local DisplayAvailability := Round(Availability, 1)
-            if (this.DisconnectsToday > 0 && DisplayAvailability = 100.0) {
-                DisplayAvailability := 99.9
-            }
+
+            ; Format to exactly one decimal place to avoid floating point precision issues
+            local DisplayAvailability := Format("{:.1f}", Availability)
             
             ; Keep tooltip concise due to Windows tooltip length limitations
             A_IconTip := (
