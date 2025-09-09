@@ -7,10 +7,14 @@ class NetNotifierApp {
     static MIN_INTERVAL := 5000  ; 5 seconds minimum to reduce false positives
     static MAX_INTERVAL := 300000
     static IP_CACHE_TTL := 5 * 60 * 1000  ; 5 minutes
+    static HTTP_TIMEOUT_DEFAULT := 5000  ; 5 seconds default timeout
+    static HTTP_TIMEOUT_MIN := 3000  ; 3 seconds minimum
+    static HTTP_TIMEOUT_MAX := 10000  ; 10 seconds maximum
 
     Interval := NetNotifierApp.DEFAULT_INTERVAL
     TestURL := "https://www.google.com"
     VoiceAlerts := 1
+    HTTPTimeout := NetNotifierApp.HTTP_TIMEOUT_DEFAULT
     Online := false
     OnlineTime := 0
     DisconnectsToday := 0
@@ -24,10 +28,13 @@ class NetNotifierApp {
     PublicIPLastFetch := 0
     PublicIPCacheTTL := NetNotifierApp.IP_CACHE_TTL
     gVoice := ""
+    ; Async flags for connectivity checks
+    HTTPWorking := false  ; Flag for async HTTP check
     ; GUI input controls
     IntervalInput := ""
     TestURLInput := ""
     VoiceAlertsInput := ""
+    HTTPTimeoutInput := ""
 
     __New() {
         this.gVoice := ComObject("SAPI.SpVoice")
@@ -69,12 +76,19 @@ class NetNotifierApp {
             this.TestURL := IniRead(SettingsFile, "Settings", "TestURL", "https://www.google.com")
             this.VoiceAlerts := Integer(IniRead(SettingsFile, "Settings", "VoiceAlerts", "1"))
             this.VoiceAlerts := this.VoiceAlerts ? 1 : 0  ; force 0/1 int
+            this.HTTPTimeout := Integer(IniRead(SettingsFile, "Settings", "HTTPTimeout", NetNotifierApp.HTTP_TIMEOUT_DEFAULT))
 
             ; Validate interval
             if (this.Interval < NetNotifierApp.MIN_INTERVAL)
                 this.Interval := NetNotifierApp.MIN_INTERVAL
             if (this.Interval > NetNotifierApp.MAX_INTERVAL)
                 this.Interval := NetNotifierApp.MAX_INTERVAL
+
+            ; Validate HTTP timeout
+            if (this.HTTPTimeout < NetNotifierApp.HTTP_TIMEOUT_MIN)
+                this.HTTPTimeout := NetNotifierApp.HTTP_TIMEOUT_MIN
+            if (this.HTTPTimeout > NetNotifierApp.HTTP_TIMEOUT_MAX)
+                this.HTTPTimeout := NetNotifierApp.HTTP_TIMEOUT_MAX
         } catch {
             this.CreateDefaultSettings()
         }
@@ -83,7 +97,7 @@ class NetNotifierApp {
     CreateDefaultSettings() {
         local SettingsFile := A_ScriptDir . "\Settings.ini"
         try {
-            FileAppend("[Settings]`nInterval=" . this.DEFAULT_INTERVAL . "`nTestURL=https://www.google.com`nVoiceAlerts=1`n", SettingsFile)
+            FileAppend("[Settings]`nInterval=" . this.DEFAULT_INTERVAL . "`nTestURL=https://www.google.com`nVoiceAlerts=1`nHTTPTimeout=" . this.HTTP_TIMEOUT_DEFAULT . "`n", SettingsFile)
         } catch {
             ; Ignore if can't create file
         }
@@ -134,17 +148,34 @@ class NetNotifierApp {
     }
 
     CheckInternetHTTP() {
-        try {
-            local Http := ComObject("MSXML2.ServerXMLHTTP")
-            Http.Open("GET", this.TestURL, false)
-            Http.Send()
-            if (Http.status == 200) {
-                return true
-            }
-        } catch as e {
-            this.Log("HTTP check failed: " . e.Message, "DEBUG")
+        this.Log("Starting async HTTP check to " . this.TestURL, "DEBUG")
+        this.HTTPWorking := false  ; Reset flag
+        ; Async HTTP check
+        this._CheckHTTPAsync()
+        ; Wait up to HTTPTimeout for async result
+        local start := A_TickCount
+        while (A_TickCount - start < this.HTTPTimeout) {
+            if (this.HTTPWorking !== false)  ; Flag has been set
+                break
+            Sleep(50)
         }
-        return false
+        return this.HTTPWorking
+    }
+
+    _CheckHTTPAsync() {
+        callback := ObjBindMethod(this, "_HandleHTTPResponse")
+        headersObj := Map("__timeoutMs", this.HTTPTimeout)
+        this.HttpRequestAsync("GET", this.TestURL, headersObj, "", callback)
+    }
+
+    _HandleHTTPResponse(response, status, headers) {
+        if (status == 200) {
+            this.Log("Async HTTP check succeeded", "DEBUG")
+            this.HTTPWorking := true
+        } else {
+            this.Log("Async HTTP check failed: HTTP " . status, "DEBUG")
+            this.HTTPWorking := false
+        }
     }
 
     CheckConnection() {
@@ -241,17 +272,18 @@ class NetNotifierApp {
         this.SettingsGui.MarginY := 15
         
         ; Settings controls
-        this.SettingsGui.Add("Text", "Section", "Check Interval (seconds):")
-        this.IntervalInput := this.SettingsGui.Add("Edit", "xs w200 Number", this.Interval // 1000)
-        this.SettingsGui.Add("Text", "xs", "Range: " . (NetNotifierApp.MIN_INTERVAL // 1000) . "-" . (NetNotifierApp.MAX_INTERVAL // 1000) . " seconds")
-
-        this.SettingsGui.Add("Text", "xs Section", "Test URL:")
+        this.SettingsGui.Add("Text", "Section", "Test URL:")
         this.TestURLInput := this.SettingsGui.Add("Edit", "xs w200", this.TestURL)
-        this.SettingsGui.Add("Text", "xs", "Default: https://www.google.com")
+
+        this.SettingsGui.Add("Text", "xs Section", "Check Interval (seconds):")
+        this.IntervalInput := this.SettingsGui.Add("Edit", "xs w200 Number", this.Interval // 1000)
+
+        this.SettingsGui.Add("Text", "xs Section", "HTTP Timeout (ms):")
+        this.HTTPTimeoutInput := this.SettingsGui.Add("Edit", "xs w200 Number", this.HTTPTimeout)
 
         this.VoiceAlertsInput := this.SettingsGui.Add("CheckBox", "xs Section", "Enable Voice Alerts")
         this.VoiceAlertsInput.Value := this.VoiceAlerts  ; 0 or 1
-        
+         
         ; Buttons
         local SaveBtn := this.SettingsGui.Add("Button", "xs Section w60 h30 Default", "&Save")
         local TestBtn := this.SettingsGui.Add("Button", "x+10 w60 h30", "&Test")
@@ -264,7 +296,7 @@ class NetNotifierApp {
         
         ; Add event handlers for GUI
         this.SettingsGui.OnEvent("Close", (*) => this.SettingsGui.Destroy())
-        this.SettingsGui.Show("w230")
+        this.SettingsGui.Show("")
     }
 
     SettingsButtonSave(*) {
@@ -273,6 +305,7 @@ class NetNotifierApp {
             local NewInterval := Integer(this.IntervalInput.Text) * 1000  ; Convert to milliseconds
             local NewTestURL := Trim(this.TestURLInput.Text)
             local NewVoiceAlerts := this.VoiceAlertsInput.Value  ; 0 or 1
+            local NewHTTPTimeout := Integer(this.HTTPTimeoutInput.Text)
 
             ; Validate interval
             if (NewInterval < NetNotifierApp.MIN_INTERVAL) {
@@ -293,17 +326,31 @@ class NetNotifierApp {
                 return
             }
 
+            ; Validate HTTP Timeout
+            if (NewHTTPTimeout < NetNotifierApp.HTTP_TIMEOUT_MIN) {
+                MsgBox("HTTP Timeout must be at least " . NetNotifierApp.HTTP_TIMEOUT_MIN . " ms!", "Invalid Input", "OK Icon!")
+                this.HTTPTimeoutInput.Focus()
+                return
+            }
+            if (NewHTTPTimeout > NetNotifierApp.HTTP_TIMEOUT_MAX) {
+                MsgBox("HTTP Timeout cannot exceed " . NetNotifierApp.HTTP_TIMEOUT_MAX . " ms!", "Invalid Input", "OK Icon!")
+                this.HTTPTimeoutInput.Focus()
+                return
+            }
+
             ; Write to INI file FIRST
             local SettingsFile := A_ScriptDir . "\Settings.ini"
 
             IniWrite(NewInterval, SettingsFile, "Settings", "Interval")
             IniWrite(NewTestURL, SettingsFile, "Settings", "TestURL")
             IniWrite(NewVoiceAlerts ? 1 : 0, SettingsFile, "Settings", "VoiceAlerts")
+            IniWrite(NewHTTPTimeout, SettingsFile, "Settings", "HTTPTimeout")
 
             ; Update properties AFTER successful file write
             this.Interval := NewInterval
             this.TestURL := NewTestURL
             this.VoiceAlerts := NewVoiceAlerts  ; Store as integer (0 or 1)
+            this.HTTPTimeout := NewHTTPTimeout
 
             ; Update timer with new interval
             SetTimer(() => this.CheckConnection(), this.Interval)
