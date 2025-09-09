@@ -210,9 +210,9 @@ The following DllCall usages and networking checks may cause blocking:
 4. **Avoid Sleep** – Replace `Sleep` with `SetTimer` or non-blocking waits.
 5. **UI Responsiveness** – Avoid modal message boxes or `.Show` that block. Use `Gui` events and `OnEvent` for handling user actions.
 
+## Implementation & Running
+
+Fix each each issue one by one not at once. Once each issue is fixed, try to run the NetNotifier.ahk script like with `/ErrorStdOut` flag to capture any startup errors eg `"C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey64.exe" /ErrorStdOut {SCRIPT_PATH_HERE}`. If there will be any errors, a error.log file will be placed in same folder as script so you can verify whether or not there is any error you need to fix. Once issue is fixed completely, only then move to next issue and so on.
+
 ## TODO List
-- [ ] Refactor all `RunWait` calls (Line ~216) → use `Run` with redirected output.
-- [ ] Audit all `ComObjCreate("WinHttpRequest")` usages → ensure async flag enabled and event handlers connected.
-- [ ] Replace any `Sleep` calls with `SetTimer` callbacks.
-- [ ] Make ping checks non-blocking (wrap in timer-driven subprocesses).
-- [ ] Adjust GUI `.Show` to avoid freezing main thread, e.g., by not using modal flags.
+Maintain a todo list of tasks and mark them completed once done.
