@@ -3,11 +3,11 @@
 
 class NetNotifierApp {
     ; Constants
-    static DEFAULT_INTERVAL := 5000
-    static DEFAULT_PING_TIMEOUT := 2000  ; 2 seconds for faster detection
+    static DEFAULT_INTERVAL := 3000
+    static DEFAULT_PING_TIMEOUT := 3000  ; 2 seconds for faster detection
     static MIN_INTERVAL := 1000
     static MAX_INTERVAL := 300000
-    static MIN_PING_TIMEOUT := 500
+    static MIN_PING_TIMEOUT := 2000
     static MAX_PING_TIMEOUT := 10000
     static IP_CACHE_TTL := 5 * 60 * 1000  ; 5 minutes
     static GATEWAY_CACHE_TTL := 10 * 60 * 1000  ; 10 minutes for gateway
