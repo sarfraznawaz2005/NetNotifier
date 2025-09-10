@@ -116,8 +116,8 @@ class NetNotifierApp {
         local currentTime := A_TickCount
         if (newStatus != oldStatus) {
             this.StatusChangeCount++
-            ; If status changed too recently (within 3 seconds), ignore unless it's a significant change
-            if (currentTime - this.LastStatusChangeTime < 3000 && this.StatusChangeCount > 2) {
+            ; If status changed too recently (within 5 seconds), ignore unless it's a significant change
+            if (currentTime - this.LastStatusChangeTime < 5000 && this.StatusChangeCount > 2) {
                 this.Log("Ignoring rapid status change to prevent flapping", "WARN")
                 return
             }
