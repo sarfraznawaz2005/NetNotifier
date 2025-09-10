@@ -529,7 +529,7 @@ A_TrayMenu.Add("Exit", (*) => ExitApp())
 A_TrayMenu.Default := "Settings"
 
 ; Initialize with proper status
-TraySetIcon("green.ico", 1, true)
+TraySetIcon("issues.ico", 1, true)
 
 app.CheckConnection()
 ; Use a more robust timer that checks if previous check is still running
