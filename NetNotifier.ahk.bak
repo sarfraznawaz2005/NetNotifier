@@ -186,7 +186,7 @@ class NetNotifierApp {
 
     _CheckHTTPAsync() {
         callback := ObjBindMethod(this, "_HandleHTTPResponse")
-        headersObj := Map("__timeoutMs", this.HTTPTimeout)
+        headersObj := Map("__timeoutMs", this.HTTPTimeout, "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
         this.HttpRequestAsync("GET", this.TestURL, headersObj, "", callback)
     }
 
@@ -258,7 +258,7 @@ class NetNotifierApp {
         ; Set icon based on current status
         if (this.LastStatus == "ONLINE") {
             TraySetIcon("online.ico", 1, true)
-            
+
             local ElapsedTime := (A_TickCount - this.OnlineTime) // 1000
             local Hours := ElapsedTime // 3600
             local Minutes := Mod(ElapsedTime, 3600) // 60
@@ -471,11 +471,11 @@ class NetNotifierApp {
             return "N/A"
         }
     }
-    
+
 	GetPublicIPFetch() {
 		; Async fetch with retry
 		this._FetchIPWithRetry("https://api.ipify.org/")
-	}    
+	}
 
 	_FetchIPWithRetry(url, attempt := 1) {
 		maxAttempts := 2
