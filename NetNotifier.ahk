@@ -3,13 +3,13 @@
 
 class NetNotifierApp {
     ; Constants
-    static DEFAULT_INTERVAL := 5000  ; 5 seconds for balanced detection
+    static DEFAULT_INTERVAL := 10000  ; 10 seconds for balanced detection
     static MIN_INTERVAL := 5000  ; 5 seconds minimum to reduce false positives
     static MAX_INTERVAL := 300000
     static IP_CACHE_TTL := 5 * 60 * 1000  ; 5 minutes
-    static HTTP_TIMEOUT_DEFAULT := 10000  ; 10 seconds default timeout
-    static HTTP_TIMEOUT_MIN := 3000  ; 3 seconds minimum
-    static HTTP_TIMEOUT_MAX := 10000  ; 10 seconds maximum
+    static HTTP_TIMEOUT_DEFAULT := 20000  ; 20 seconds default timeout
+    static HTTP_TIMEOUT_MIN := 5000  ; 5 seconds minimum
+    static HTTP_TIMEOUT_MAX := 30000  ; 30 seconds maximum
 
     Interval := NetNotifierApp.DEFAULT_INTERVAL
     TestURL := "https://www.google.com"
@@ -116,8 +116,8 @@ class NetNotifierApp {
         local currentTime := A_TickCount
         if (newStatus != oldStatus) {
             this.StatusChangeCount++
-            ; If status changed too recently (within 5 seconds), ignore unless it's a significant change
-            if (currentTime - this.LastStatusChangeTime < 5000 && this.StatusChangeCount > 2) {
+            ; If status changed too recently, ignore unless it's a significant change
+            if (currentTime - this.LastStatusChangeTime < this.Interval && this.StatusChangeCount > 2) {
                 this.Log("Ignoring rapid status change to prevent flapping", "WARN")
                 return
             }
@@ -134,7 +134,8 @@ class NetNotifierApp {
             if (oldStatus != "ONLINE" || this.FirstRun) {  ; Starting or reconnecting
                 this.OnlineTime := A_TickCount
                 ; refresh public IP on becoming online
-                this.GetPublicIPFetch() ; This is now async
+                ;this.GetPublicIPFetch() ; async
+                this.GetPublicIPSync()
             }
         } else { ; OFFLINE
             this.Online := false
@@ -257,6 +258,7 @@ class NetNotifierApp {
         ; Set icon based on current status
         if (this.LastStatus == "ONLINE") {
             TraySetIcon("green.ico", 1, true)
+            
             local ElapsedTime := (A_TickCount - this.OnlineTime) // 1000
             local Hours := ElapsedTime // 3600
             local Minutes := Mod(ElapsedTime, 3600) // 60
@@ -448,48 +450,65 @@ class NetNotifierApp {
         if (this.PublicIPCache != "" && (A_TickCount - this.PublicIPLastFetch) < this.PublicIPCacheTTL) {
             return this.PublicIPCache
         }
-        ; Trigger an async fetch, but return current cache or N/A immediately
-        this.GetPublicIPFetch() ; This is now async
-        return this.PublicIPCache != "" ? this.PublicIPCache : "Fetching..." ; Indicate that it's being fetched
+        ; Fetch sync and update cache
+        ;this.PublicIPCache := this.GetPublicIPFetch() ; async
+        this.PublicIPCache := this.GetPublicIPSync()
+        this.PublicIPLastFetch := A_TickCount
+        return this.PublicIPCache
     }
 
-    GetPublicIPFetch() {
-        ; Async fetch with retry
-        this._FetchIPWithRetry("https://api.ipify.org/")
-    }
-
-    _FetchIPWithRetry(url, attempt := 1) {
-        maxAttempts := 2
-        fallbackUrl := "https://icanhazip.com/"
-        callback := ObjBindMethod(this, "_HandleIPResponse", url, attempt, maxAttempts, fallbackUrl)
-        this.HttpRequestAsync("GET", url, Map(), "", callback)
-    }
-
-    _HandleIPResponse(url, attempt, maxAttempts, fallbackUrl, response, status, headers) {
-        if (status == 200 && response != "") {
-            this.PublicIPCache := Trim(response)
-            this.PublicIPLastFetch := A_TickCount
-            this.Log("Fetched public IP: " . this.PublicIPCache, "INFO")
-        } else {
-            this.Log("Failed to fetch IP from " . url . " (attempt " . attempt . "): HTTP " . status, "WARN")
-            if (attempt < maxAttempts) {
-                if (attempt == 1) {
-                    this._FetchIPWithRetry(fallbackUrl, attempt + 1)
-                } else {
-                    this.PublicIPCache := "N/A (HTTP " . status . ")"
-                    this.PublicIPLastFetch := A_TickCount
-                }
+    GetPublicIPSync() {
+        try {
+            req := ComObject("MSXML2.ServerXMLHTTP")
+            req.open("GET", "https://api.ipify.org/", false)
+            req.send()
+            if (req.status == 200) {
+                return Trim(req.responseText)
             } else {
-                this.PublicIPCache := "N/A (Error)"
-                this.PublicIPLastFetch := A_TickCount
+                return "N/A"
             }
+        } catch {
+            return "N/A"
         }
     }
+    
+	GetPublicIPFetch() {
+		; Async fetch with retry
+		this._FetchIPWithRetry("https://api.ipify.org/")
+	}    
+
+	_FetchIPWithRetry(url, attempt := 1) {
+		maxAttempts := 2
+		fallbackUrl := "https://icanhazip.com/"
+		callback := ObjBindMethod(this, "_HandleIPResponse", url, attempt, maxAttempts, fallbackUrl)
+		this.HttpRequestAsync("GET", url, Map(), "", callback)
+	}
+
+	_HandleIPResponse(url, attempt, maxAttempts, fallbackUrl, response, status, headers) {
+		if (status == 200 && response != "") {
+			this.PublicIPCache := Trim(response)
+			this.PublicIPLastFetch := A_TickCount
+			this.Log("Fetched public IP: " . this.PublicIPCache, "INFO")
+		} else {
+			this.Log("Failed to fetch IP from " . url . " (attempt " . attempt . "): HTTP " . status, "WARN")
+			if (attempt < maxAttempts) {
+				if (attempt == 1) {
+					this._FetchIPWithRetry(fallbackUrl, attempt + 1)
+				} else {
+					this.PublicIPCache := "N/A (HTTP " . status . ")"
+					this.PublicIPLastFetch := A_TickCount
+				}
+			} else {
+				this.PublicIPCache := "N/A (Error)"
+				this.PublicIPLastFetch := A_TickCount
+			}
+		}
+	}
 
     Speak(text) {
         try {
-            ; 1 = SVSFlagsAsync (non-blocking)
-            this.gVoice.Speak(text, 1)
+            ; 0 = SVSFlagsSync (blocking)
+            this.gVoice.Speak(text, 0)
         } catch as e {
             ; Silent fail
         }
@@ -505,6 +524,7 @@ A_TrayMenu.Add("Settings", (*) => app.ShowSettings())
 A_TrayMenu.Add("Check Now", (*) => app.CheckConnection())
 A_TrayMenu.Add("Reset Statistics", (*) => app.ResetStats())
 A_TrayMenu.Add()  ; Separator
+A_TrayMenu.Add("Reload", (*) => Reload())
 A_TrayMenu.Add("Exit", (*) => ExitApp())
 A_TrayMenu.Default := "Settings"
 
