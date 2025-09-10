@@ -258,7 +258,7 @@ class NetNotifierApp {
         ; Set icon based on current status
         if (this.LastStatus == "ONLINE") {
             TraySetIcon("online.ico", 1, true)
-
+            
             local ElapsedTime := (A_TickCount - this.OnlineTime) // 1000
             local Hours := ElapsedTime // 3600
             local Minutes := Mod(ElapsedTime, 3600) // 60
@@ -471,11 +471,11 @@ class NetNotifierApp {
             return "N/A"
         }
     }
-
+    
 	GetPublicIPFetch() {
 		; Async fetch with retry
 		this._FetchIPWithRetry("https://api.ipify.org/")
-	}
+	}    
 
 	_FetchIPWithRetry(url, attempt := 1) {
 		maxAttempts := 2
