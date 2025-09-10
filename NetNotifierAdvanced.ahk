@@ -361,7 +361,7 @@ class NetNotifierApp {
     UpdateTooltip() {
         ; Set icon based on current status
         if (this.LastStatus == "ONLINE") {
-            TraySetIcon("green.ico", 1, true)
+            TraySetIcon("online.ico", 1, true)
             local ElapsedTime := (A_TickCount - this.OnlineTime) // 1000
             local Hours := ElapsedTime // 3600
             local Minutes := Mod(ElapsedTime, 3600) // 60
@@ -384,13 +384,13 @@ class NetNotifierApp {
                 . "Up:`t" . DisplayAvailability . "%"
             )
         } else if (this.LastStatus == "ISSUES") {
-            TraySetIcon("issues.ico", 1, true)
+            TraySetIcon("no-internet.ico", 1, true)
             A_IconTip := ("NO INTERNET")
         } else if (this.LastStatus == "DNS_FAILURE") {
-            TraySetIcon("red.ico", 1, true)
+            TraySetIcon("offline.ico", 1, true)
             A_IconTip := ("OFFLINE")
         } else {
-            TraySetIcon("red.ico", 1, true)
+            TraySetIcon("offline.ico", 1, true)
             A_IconTip := ("OFFLINE")
         }
     }
@@ -759,7 +759,7 @@ A_TrayMenu.Add("Exit", (*) => ExitApp())
 A_TrayMenu.Default := "Settings"
 
 ; Initialize with proper status
-TraySetIcon("green.ico", 1, true)
+TraySetIcon("online.ico", 1, true)
 
 app.CheckConnection()
 SetTimer(() => app.CheckConnection(), app.Interval)

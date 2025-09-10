@@ -257,7 +257,7 @@ class NetNotifierApp {
     UpdateTooltip() {
         ; Set icon based on current status
         if (this.LastStatus == "ONLINE") {
-            TraySetIcon("green.ico", 1, true)
+            TraySetIcon("online.ico", 1, true)
             
             local ElapsedTime := (A_TickCount - this.OnlineTime) // 1000
             local Hours := ElapsedTime // 3600
@@ -279,7 +279,7 @@ class NetNotifierApp {
                 . "Up:`t" . DisplayAvailability . "%"
             )
         } else {
-            TraySetIcon("red.ico", 1, true)
+            TraySetIcon("offline.ico", 1, true)
             A_IconTip := ("OFFLINE")
         }
     }
@@ -529,7 +529,7 @@ A_TrayMenu.Add("Exit", (*) => ExitApp())
 A_TrayMenu.Default := "Settings"
 
 ; Initialize with proper status
-TraySetIcon("issues.ico", 1, true)
+TraySetIcon("no-internet.ico", 1, true)
 
 app.CheckConnection()
 ; Use a more robust timer that checks if previous check is still running
