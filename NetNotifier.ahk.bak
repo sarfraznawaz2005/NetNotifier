@@ -100,7 +100,7 @@ class NetNotifierApp {
     CreateDefaultSettings() {
         local SettingsFile := A_ScriptDir . "\Settings.ini"
         try {
-            FileAppend("[Settings]`nInterval=" . this.DEFAULT_INTERVAL . "`nTestURLs=https://www.google.com,https://www.bing.com`nVoiceAlerts=1`nHTTPTimeout=" . this.HTTP_TIMEOUT_DEFAULT . "`n", SettingsFile)
+            FileAppend("[Settings]`nInterval=" . NetNotifierApp.DEFAULT_INTERVAL . "`nTestURLs=https://www.google.com,https://www.bing.com`nVoiceAlerts=1`nHTTPTimeout=" . NetNotifierApp.HTTP_TIMEOUT_DEFAULT . "`n", SettingsFile)
         } catch {
             ; Ignore if can't create file
         }
@@ -115,9 +115,10 @@ class NetNotifierApp {
     HandleStatusChange(newStatus, oldStatus) {
         ; Add hysteresis to prevent rapid status changes
         local currentTime := A_TickCount
+        
+        ; If status changed too recently, ignore unless it's a significant change
         if (newStatus != oldStatus) {
             this.StatusChangeCount++
-            ; If status changed too recently, ignore unless it's a significant change
             if (currentTime - this.LastStatusChangeTime < this.Interval && this.StatusChangeCount > 2) {
                 this.Log("Ignoring rapid status change to prevent flapping", "WARN")
                 return
@@ -166,27 +167,28 @@ class NetNotifierApp {
         }
     }
 
-    CheckInternetHTTPMulti() {
+ CheckInternetHTTPMulti() {
         this.Log("Starting multi-target HTTP check", "DEBUG")
-        for index, url in this.TestURLs {
+        for url in this.TestURLs {
             this.Log("Attempting HTTP check to " . url, "DEBUG")
-            this.HTTPWorking := false  ; Reset flag for each attempt
-            this._CheckHTTPAsync(url)
-            local start := A_TickCount
-            while (A_TickCount - start < this.HTTPTimeout) {
-                if (this.HTTPWorking !== false)
-                    break
-                Sleep(50)
-            }
-            if (this.HTTPWorking) {
-                this.Log("HTTP check succeeded for " . url, "INFO")
-                return true
-            } else {
-                this.Log("HTTP check failed for " . url, "WARN")
+            try {
+                req := ComObject("MSXML2.ServerXMLHTTP")
+                req.open("GET", url, false) ; false for synchronous
+                req.setTimeouts(this.HTTPTimeout, this.HTTPTimeout, this.HTTPTimeout, this.HTTPTimeout)
+                req.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36")
+                req.send()
+                if (req.status == 200) {
+                    this.Log("HTTP check succeeded for " . url, "INFO")
+                    return true ; Success, connection is ONLINE
+                } else {
+                    this.Log("HTTP check failed for " . url . " with status " . req.status, "WARN")
+                }
+            } catch as e {
+                this.Log("HTTP check failed for " . url . " with exception: " . e.Message, "WARN")
             }
         }
         this.Log("All HTTP checks failed - OFFLINE", "INFO")
-        return false
+        return false ; All URLs failed
     }
 
     _CheckHTTPAsync(url) {
