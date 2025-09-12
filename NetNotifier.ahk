@@ -100,7 +100,7 @@ class NetNotifierApp {
     CreateDefaultSettings() {
         local SettingsFile := A_ScriptDir . "\Settings.ini"
         try {
-            FileAppend("[Settings]`nInterval=" . this.DEFAULT_INTERVAL . "`nTestURLs=https://www.google.com,https://www.bing.com`nVoiceAlerts=1`nHTTPTimeout=" . this.HTTP_TIMEOUT_DEFAULT . "`n", SettingsFile)
+            FileAppend("[Settings]`nInterval=" . NetNotifierApp.DEFAULT_INTERVAL . "`nTestURLs=https://www.google.com,https://www.bing.com`nVoiceAlerts=1`nHTTPTimeout=" . NetNotifierApp.HTTP_TIMEOUT_DEFAULT . "`n", SettingsFile)
         } catch {
             ; Ignore if can't create file
         }
